@@ -1,7 +1,7 @@
 defmodule ElixirStream.TranscoderConsumer do
   use ConsumerSupervisor
 
-  def start_link() do
+  def start_link(_input) do
     ConsumerSupervisor.start_link(__MODULE__, :ok)
   end
 

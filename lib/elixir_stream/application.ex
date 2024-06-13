@@ -9,14 +9,17 @@ defmodule ElixirStream.Application do
   def start(_type, _args) do
     children = [
       ElixirStream.Repo,
+      # Start the endpoint when the application starts
+      ElixirStreamWeb.Endpoint,
+      ElixirStream.Voter,
+      {ElixirStream.VideoStreamer, ["chunk/*.webm"]},
+      ElixirStream.TranscoderProducer,
+      ElixirStream.TranscoderConsumer,
       {DNSCluster, query: Application.get_env(:elixir_stream, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: ElixirStream.PubSub},
-      # Start the Finch HTTP client for sending emails
-      {Finch, name: ElixirStream.Finch},
       # Start a worker by calling: ElixirStream.Worker.start_link(arg)
-      # {ElixirStream.Worker, arg},
+      # ElixirStream.Worker, arg},
       # Start to serve requests, typically the last entry
-      ElixirStreamWeb.Endpoint
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

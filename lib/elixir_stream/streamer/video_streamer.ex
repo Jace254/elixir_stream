@@ -1,40 +1,43 @@
 defmodule ElixirStream.VideoStreamer do
   use GenServer
-  def start_link(dir \\ "chunk/**/*.ts") do
-    GenServer.start_link(__MODULE__, Path.wildcard(dir), name: __MODULE__)
+
+  def start_link(dir \\ "chunk/*.webm") do
+    files = Path.wildcard(dir)
+    IO.inspect(files, label: "Matched files")
+
+    if files == [] do
+      {:error, :no_files_found}
+    else
+      GenServer.start_link(__MODULE__, files, name: __MODULE__)
+    end
   end
-  def init(dir) do
-    {:ok, dir}
+
+  def init(files) do
+    {:ok, files}
   end
 
   def start() do
-    GenServer.call(__MODULE__, :start)
+    GenServer.cast(__MODULE__, :start)
   end
 
-  def handle_call(:start, _from, dir) do
-    blocking_start_stream(dir)
-    {:reply, :ok, dir}
+  def handle_cast(:start, files) do
+    IO.inspect(files, label: "Files to stream")
+    Task.start(fn -> blocking_start_stream(files) end)
+    {:noreply, files}
   end
 
-  def start_stream(dir) do
-    dir
-    |> Stream.map(&read_bytes/1)
-    |> Task.async_stream(&apply_filter/1, concurrency: 1, ordered: true, timeout: 5_000_000)
-    |> Stream.flat_map(fn({:ok, bytes}) -> bytes end)
-    |> play
-  end
-
-  def blocking_start_stream(dir) do
-    dir
+  def blocking_start_stream(files) do
+    files
     |> Stream.map(&read_bytes/1)
     |> Stream.flat_map(&apply_filter/1)
     |> play
   end
 
   def read_bytes(file) do
-    file
-    |> File.read!()
-    |> List.wrap()
+    case File.read(file) do
+      {:ok, content} -> [content]
+      {:error, reason} -> IO.puts("Error reading file #{file}: #{reason}"); []
+    end
   end
 
   def apply_filter(bytes) do
@@ -45,7 +48,7 @@ defmodule ElixirStream.VideoStreamer do
       "-f", "mpegts",
       "-b", "12000k",
       "-acodec", "copy",
-      "-vf", "drawtext='fontfile=/Library/Fonts/Arial\ Bold.ttf: \
+      "-vf", "drawtext='fontfile=/Library/Fonts/Arial\\ Bold.ttf: \
             text=\'yays-#{yays} nays-#{nays} time-#{:os.system_time(:seconds)}\': \
             fontcolor=white: fontsize=72: box=1: boxcolor=black@0.5: \
             boxborderw=5: x=(w-text_w)/2: y=(h-text_h)'",
